@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Tests are not needed in runtime image
+tests/
+
+# Documentation not needed in runtime image
+README.md

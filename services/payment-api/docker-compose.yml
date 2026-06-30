@@ -1,0 +1,18 @@
+services:
+  payment-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finguard/payment-api:phase-2
+    container_name: finguard-payment-api
+    environment:
+      APP_ENV: compose
+      PAYMENT_API_PORT: "8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

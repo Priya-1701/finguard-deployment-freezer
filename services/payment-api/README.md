@@ -27,12 +27,14 @@ This API gives us:
 
 These signals will later be used by the deployment freezer controller to decide whether a release should continue, pause, rollback, or freeze.
 
-## Local Setup
+## Phase 2: Dockerized Payment API
 
-From the project root:
+Phase 2 packages the Payment API into a Docker image.
+
+## Build Docker Image
+
+From project root:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r services/payment-api/requirements.txt
+cd services/payment-api
+docker build -t finguard/payment-api:phase-2 .
