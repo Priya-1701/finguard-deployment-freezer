@@ -1,10 +1,8 @@
-.PHONY: phase0-check tree docker-check kind-smoke-test kind-smoke-delete git-status \
-        payment-api-install payment-api-test payment-api-run payment-api-health payment-api-metrics \
-        payment-api-docker-build payment-api-docker-run payment-api-docker-logs payment-api-docker-stop \
-        payment-api-docker-health payment-api-docker-metrics payment-api-compose-up payment-api-compose-down \
-        payment-api-compose-reset payment-api-compose-logs payment-api-db-health payment-api-db-shell \
-        payment-api-trivy-scan kind-create kind-delete kind-load-images k8s-apply k8s-delete \
-        k8s-status k8s-wait k8s-logs k8s-port-forward k8s-db-shell k8s-restart k8s-scale-up k8s-scale-down
+.PHONY: phase0-check tree docker-check git-status \
+        payment-api-install payment-api-test payment-api-run payment-api-health payment-api-db-health payment-api-metrics \
+        payment-api-compose-up payment-api-compose-down payment-api-compose-reset payment-api-compose-logs payment-api-db-shell \
+        payment-api-trivy-scan \
+        kind-create kind-delete kind-load-images k8s-apply k8s-delete k8s-status k8s-wait k8s-port-forward
 
 phase0-check:
 	./scripts/phase0_doctor.sh
@@ -16,15 +14,6 @@ docker-check:
 	docker --version
 	docker info
 	docker run hello-world
-
-kind-smoke-test:
-	kind create cluster --name finguard-phase0-test
-	kubectl cluster-info --context kind-finguard-phase0-test
-	kubectl get nodes
-	kubectl get pods -A
-
-kind-smoke-delete:
-	kind delete cluster --name finguard-phase0-test
 
 git-status:
 	git status
@@ -49,24 +38,6 @@ payment-api-db-health:
 payment-api-metrics:
 	curl -s http://127.0.0.1:8000/metrics | grep finguard | head -n 30
 
-payment-api-docker-build:
-	cd services/payment-api && docker compose build
-
-payment-api-docker-run:
-	cd services/payment-api && docker compose up -d
-
-payment-api-docker-logs:
-	cd services/payment-api && docker compose logs payment-api
-
-payment-api-docker-health:
-	curl -s http://127.0.0.1:8000/health | jq
-
-payment-api-docker-metrics:
-	curl -s http://127.0.0.1:8000/metrics | grep finguard | head -n 30
-
-payment-api-docker-stop:
-	cd services/payment-api && docker compose down
-
 payment-api-compose-up:
 	cd services/payment-api && docker compose up --build -d
 
@@ -80,10 +51,10 @@ payment-api-compose-logs:
 	cd services/payment-api && docker compose logs
 
 payment-api-db-shell:
-	docker exec -it finguard-postgres psql -U finguard_user -d finguard
+	cd services/payment-api && docker compose exec postgres psql -U finguard_user -d finguard
 
 payment-api-trivy-scan:
-	trivy image --severity HIGH,CRITICAL --ignore-unfixed finguard/payment-api:phase-3
+	trivy image --severity HIGH,CRITICAL --ignore-unfixed finguard/payment-api:phase-4
 
 kind-create:
 	kind create cluster --name finguard-local --config platform/kind/finguard-kind-config.yaml
@@ -92,44 +63,85 @@ kind-delete:
 	kind delete cluster --name finguard-local
 
 kind-load-images:
-	docker build -t finguard/payment-api:phase-4 services/payment-api
-	docker pull postgres:16-alpine
-	kind load docker-image finguard/payment-api:phase-4 --name finguard-local
-	kind load docker-image postgres:16-alpine --name finguard-local
+	if [ "$$(uname -m)" = "arm64" ]; then \
+		DOCKER_PLATFORM="linux/arm64"; \
+	else \
+		DOCKER_PLATFORM="linux/amd64"; \
+	fi; \
+	docker buildx build \
+		--platform "$$DOCKER_PLATFORM" \
+		--provenance=false \
+		--sbom=false \
+		--load \
+		-t finguard/payment-api:phase-4 \
+		services/payment-api
+	docker save finguard/payment-api:phase-4 -o /tmp/finguard-payment-api-phase-4.tar
+	kind load image-archive /tmp/finguard-payment-api-phase-4.tar --name finguard-local
+	docker exec finguard-local-control-plane crictl images | grep finguard
 
 k8s-apply:
 	kubectl apply -k platform/k8s/overlays/local
 
 k8s-delete:
-	kubectl delete -k platform/k8s/overlays/local
+	kubectl delete -k platform/k8s/overlays/local || true
 
 k8s-status:
-	kubectl -n finguard get all
-	kubectl -n finguard get pvc
-	kubectl -n finguard get svc
+	kubectl get all -n finguard
 
 k8s-wait:
-	kubectl -n finguard wait --for=condition=ready pod/postgres-0 --timeout=180s
+	kubectl -n finguard wait --for=condition=ready pod/finguard-postgres-0 --timeout=180s
 	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
-
-k8s-logs:
-	kubectl -n finguard logs postgres-0 --tail=50
-	kubectl -n finguard logs deployment/payment-api --tail=50
 
 k8s-port-forward:
-	kubectl -n finguard port-forward svc/payment-api 8000:8000
+	kubectl port-forward -n finguard svc/payment-api 8000:8000
 
-k8s-db-shell:
-	kubectl -n finguard exec -it postgres-0 -- psql -U finguard_user -d finguard
+.PHONY: monitoring-install monitoring-status monitoring-apply-dashboard monitoring-prometheus monitoring-grafana monitoring-alertmanager monitoring-uninstall monitoring-test-traffic monitoring-test-errors monitoring-test-latency
 
-k8s-restart:
-	kubectl -n finguard rollout restart deployment/payment-api
-	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+monitoring-install:
+	kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+	helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+		--namespace monitoring \
+		--values observability/prometheus/kube-prometheus-stack-values.yaml
 
-k8s-scale-up:
-	kubectl -n finguard scale deployment/payment-api --replicas=2
-	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+monitoring-status:
+	kubectl -n monitoring get pods
+	kubectl -n monitoring get svc
+	kubectl -n finguard get servicemonitor
+	kubectl -n finguard get prometheusrule
 
-k8s-scale-down:
-	kubectl -n finguard scale deployment/payment-api --replicas=1
-	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+monitoring-apply-dashboard:
+	kubectl apply -f observability/grafana/dashboards/payment-api-dashboard-configmap.yaml
+
+monitoring-prometheus:
+	kubectl -n monitoring port-forward svc/monitoring-prometheus 9090:9090
+
+monitoring-grafana:
+	kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+
+monitoring-alertmanager:
+	kubectl -n monitoring port-forward svc/monitoring-alertmanager 9093:9093
+
+monitoring-uninstall:
+	helm uninstall monitoring -n monitoring || true
+	kubectl delete namespace monitoring || true
+
+monitoring-test-traffic:
+	for i in $$(seq 1 20); do \
+		curl -s -X POST http://127.0.0.1:8000/pay \
+			-H "Content-Type: application/json" \
+			-d "{\"amount\": $$((100 + i)), \"currency\": \"INR\", \"merchant_id\": \"merchant_obs_001\", \"customer_id\": \"customer_obs_$$i\", \"idempotency_key\": \"obs-order-$$i\"}" >/dev/null; \
+	done
+
+monitoring-test-errors:
+	for i in $$(seq 1 20); do \
+		curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/simulate/error; \
+		sleep 1; \
+	done
+
+monitoring-test-latency:
+	for i in $$(seq 1 10); do \
+		curl -s "http://127.0.0.1:8000/simulate/latency?delay_ms=1200" >/dev/null; \
+		sleep 1; \
+	done

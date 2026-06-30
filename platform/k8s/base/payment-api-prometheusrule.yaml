@@ -1,0 +1,60 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-api-rules
+  labels:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/part-of: finguard-deployment-freezer
+    release: monitoring
+spec:
+  groups:
+    - name: payment-api.rules
+      rules:
+        - alert: PaymentApiTargetDown
+          expr: up{namespace="finguard", job="payment-api"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: payment-api
+          annotations:
+            summary: "Payment API target is down"
+            description: "Prometheus cannot scrape the Payment API metrics endpoint."
+
+        - alert: PaymentApiHighErrorRate
+          expr: |
+            (
+              sum(rate(finguard_http_requests_total{namespace="finguard", status_code=~"5.."}[5m]))
+              /
+              sum(rate(finguard_http_requests_total{namespace="finguard"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: payment-api
+          annotations:
+            summary: "Payment API high error rate"
+            description: "More than 5% of Payment API requests are returning 5xx errors."
+
+        - alert: PaymentApiHighP95Latency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(finguard_http_request_duration_seconds_bucket{namespace="finguard"}[5m])) by (le)
+            ) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            service: payment-api
+          annotations:
+            summary: "Payment API high p95 latency"
+            description: "Payment API p95 latency is above 500ms for more than 2 minutes."
+
+        - alert: PaymentApiSimulatedErrorsDetected
+          expr: sum(rate(finguard_payment_errors_total{namespace="finguard"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: warning
+            service: payment-api
+          annotations:
+            summary: "Payment API errors detected"
+            description: "Payment API error counter is increasing."

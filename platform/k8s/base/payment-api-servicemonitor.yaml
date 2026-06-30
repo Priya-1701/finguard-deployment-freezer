@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-api
+  labels:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/part-of: finguard-deployment-freezer
+    release: monitoring
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment-api
+  namespaceSelector:
+    matchNames:
+      - finguard
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

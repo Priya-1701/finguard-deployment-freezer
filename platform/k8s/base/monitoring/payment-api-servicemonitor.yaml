@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-api
+  namespace: finguard
+  labels:
+    release: kube-prometheus-stack
+    app: payment-api
+spec:
+  selector:
+    matchLabels:
+      app: payment-api
+  namespaceSelector:
+    matchNames:
+      - finguard
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

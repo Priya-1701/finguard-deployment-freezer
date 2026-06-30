@@ -9,3 +9,5 @@ resources:
   - postgres-statefulset.yaml
   - payment-api-service.yaml
   - payment-api-deployment.yaml
+  - monitoring/payment-api-servicemonitor.yaml
+  - monitoring/payment-api-prometheusrule.yaml

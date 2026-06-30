@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-api-slo-rules
+  namespace: finguard
+  labels:
+    release: kube-prometheus-stack
+    app: payment-api
+spec:
+  groups:
+    - name: payment-api-slo.rules
+      rules:
+        - alert: PaymentAPIHighErrorRate
+          expr: |
+            (
+              sum(rate(finguard_http_requests_total{path!="/metrics",status_code=~"5.."}[2m]))
+              /
+              sum(rate(finguard_http_requests_total{path!="/metrics"}[2m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: payment-api
+          annotations:
+            summary: "Payment API high error rate"
+            description: "More than 5% of Payment API requests are failing with 5xx errors."
+
+        - alert: PaymentAPIHighLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(finguard_http_request_duration_seconds_bucket{path!="/metrics"}[5m])) by (le)
+            ) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            service: payment-api
+          annotations:
+            summary: "Payment API high p95 latency"
+            description: "Payment API p95 latency is above 500ms."
+
+        - alert: PaymentAPIDown
+          expr: |
+            up{job=~".*payment-api.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: payment-api
+          annotations:
+            summary: "Payment API target is down"
+            description: "Prometheus cannot scrape the Payment API metrics target."
