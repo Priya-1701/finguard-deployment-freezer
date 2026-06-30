@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     """
     Application settings for the payment API.
 
-    These values can be overridden later using environment variables.
-    For Phase 1, defaults are enough for local development.
+    Phase 3 adds DATABASE_URL so the API can persist payments
+    and ledger entries in PostgreSQL.
     """
 
     app_name: str = "FinGuard Payment API"
@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     max_single_payment_amount: float = 100000.00
     readiness_status: str = "ready"
+
+    database_url: str = "sqlite:///./payment_api_local.db"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -59,3 +59,8 @@ override.tf.json
 
 # Reports
 reports/
+
+# Local SQLite databases for tests/dev fallback
+*.db
+*.sqlite
+*.sqlite3

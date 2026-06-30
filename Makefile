@@ -2,6 +2,7 @@
         payment-api-install payment-api-test payment-api-run payment-api-health payment-api-metrics \
         payment-api-docker-build payment-api-docker-run payment-api-docker-logs payment-api-docker-stop \
         payment-api-docker-health payment-api-docker-metrics payment-api-compose-up payment-api-compose-down \
+        payment-api-compose-reset payment-api-compose-logs payment-api-db-health payment-api-db-shell \
         payment-api-trivy-scan
 
 phase0-check:
@@ -41,17 +42,20 @@ payment-api-run:
 payment-api-health:
 	curl -s http://127.0.0.1:8000/health | jq
 
+payment-api-db-health:
+	curl -s http://127.0.0.1:8000/db/health | jq
+
 payment-api-metrics:
 	curl -s http://127.0.0.1:8000/metrics | grep finguard | head -n 30
 
 payment-api-docker-build:
-	cd services/payment-api && docker build -t finguard/payment-api:phase-2 .
+	cd services/payment-api && docker compose build
 
 payment-api-docker-run:
-	docker run -d --name finguard-payment-api -p 8000:8000 finguard/payment-api:phase-2
+	cd services/payment-api && docker compose up -d
 
 payment-api-docker-logs:
-	docker logs finguard-payment-api
+	cd services/payment-api && docker compose logs payment-api
 
 payment-api-docker-health:
 	curl -s http://127.0.0.1:8000/health | jq
@@ -60,8 +64,7 @@ payment-api-docker-metrics:
 	curl -s http://127.0.0.1:8000/metrics | grep finguard | head -n 30
 
 payment-api-docker-stop:
-	docker stop finguard-payment-api || true
-	docker rm finguard-payment-api || true
+	cd services/payment-api && docker compose down
 
 payment-api-compose-up:
 	cd services/payment-api && docker compose up --build -d
@@ -69,5 +72,14 @@ payment-api-compose-up:
 payment-api-compose-down:
 	cd services/payment-api && docker compose down
 
+payment-api-compose-reset:
+	cd services/payment-api && docker compose down --volumes --remove-orphans
+
+payment-api-compose-logs:
+	cd services/payment-api && docker compose logs
+
+payment-api-db-shell:
+	docker exec -it finguard-postgres psql -U finguard_user -d finguard
+
 payment-api-trivy-scan:
-	trivy image --severity HIGH,CRITICAL --ignore-unfixed finguard/payment-api:phase-2
+	trivy image --severity HIGH,CRITICAL --ignore-unfixed finguard/payment-api:phase-3

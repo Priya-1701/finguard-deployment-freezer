@@ -27,3 +27,15 @@
 - Validated containerized API behavior through Docker run and Docker Compose workflows, including health checks, payment creation, latency simulation, failure simulation, and Prometheus metrics exposure.
 
 - Integrated Trivy image scanning into the local workflow to identify high and critical container vulnerabilities before CI/CD and Kubernetes deployment.
+
+## Phase 3 Resume Bullets
+
+- Integrated PostgreSQL persistence into a Python FastAPI payment service using SQLAlchemy ORM and Docker Compose.
+
+- Designed fintech-style `payment_transactions` and `ledger_entries` tables to persist payment decisions and accounting movement records.
+
+- Implemented ledger generation logic where approved payments create debit and credit ledger entries while declined payments are persisted without financial movement.
+
+- Added database health checking through a `/db/health` endpoint to support future Kubernetes readiness, observability, alerting, and deployment-freezer decisions.
+
+- Built a local Docker Compose stack for Payment API and PostgreSQL, including database health checks, persistent volumes, and direct SQL verification through psql.

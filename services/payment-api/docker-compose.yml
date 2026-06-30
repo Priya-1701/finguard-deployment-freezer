@@ -1,18 +1,42 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finguard-postgres
+    environment:
+      POSTGRES_DB: finguard
+      POSTGRES_USER: finguard_user
+      POSTGRES_PASSWORD: finguard_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - finguard_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finguard_user -d finguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   payment-api:
     build:
       context: .
       dockerfile: Dockerfile
-    image: finguard/payment-api:phase-2
+    image: finguard/payment-api:phase-3
     container_name: finguard-payment-api
     environment:
       APP_ENV: compose
+      DATABASE_URL: postgresql+psycopg://finguard_user:finguard_password@postgres:5432/finguard
       PAYMENT_API_PORT: "8000"
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  finguard_postgres_data:

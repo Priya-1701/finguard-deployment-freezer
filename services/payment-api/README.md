@@ -38,3 +38,48 @@ From project root:
 ```bash
 cd services/payment-api
 docker build -t finguard/payment-api:phase-2 .
+
+## Phase 3: PostgreSQL and Ledger Persistence
+
+Phase 3 replaces the temporary in-memory payment store with database-backed persistence.
+
+The Payment API now stores:
+
+- Payment transactions
+- Ledger entries
+
+## Database Tables
+
+### `payment_transactions`
+
+Stores the payment decision.
+
+Important columns:
+
+- `payment_id`
+- `status`
+- `amount`
+- `currency`
+- `merchant_id`
+- `customer_id`
+- `idempotency_key`
+- `message`
+- `created_at`
+
+### `ledger_entries`
+
+Stores money movement records for approved payments.
+
+Approved payments create two ledger entries:
+
+- `DEBIT_CUSTOMER`
+- `CREDIT_MERCHANT`
+
+Declined payments do not create ledger entries.
+
+## Run API with PostgreSQL
+
+From project root:
+
+```bash
+make payment-api-compose-up

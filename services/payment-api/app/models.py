@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +29,21 @@ class PaymentResponse(BaseModel):
     created_at: datetime
 
 
+class LedgerEntryResponse(BaseModel):
+    ledger_entry_id: str
+    payment_id: str
+    entry_type: str
+    account_ref: str
+    amount: float
+    currency: str
+    created_at: datetime
+
+
+class PaymentWithLedgerResponse(BaseModel):
+    payment: PaymentResponse
+    ledger_entries: list[LedgerEntryResponse]
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -37,18 +51,8 @@ class HealthResponse(BaseModel):
     environment: str
 
 
-def build_payment_response(
-    request: PaymentRequest,
-    status: PaymentStatus,
-    message: str,
-) -> PaymentResponse:
-    return PaymentResponse(
-        payment_id=str(uuid4()),
-        status=status,
-        amount=request.amount,
-        currency=request.currency.upper(),
-        merchant_id=request.merchant_id,
-        customer_id=request.customer_id,
-        message=message,
-        created_at=datetime.now(timezone.utc),
-    )
+class DatabaseHealthResponse(BaseModel):
+    service: str
+    database: str
+    status: str
+    details: str

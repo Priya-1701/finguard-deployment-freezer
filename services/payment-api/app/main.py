@@ -1,10 +1,14 @@
 import asyncio
 import time
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import create_db_and_tables, get_db
 from app.metrics import (
     HTTP_REQUEST_DURATION_SECONDS,
     HTTP_REQUESTS_TOTAL,
@@ -14,18 +18,32 @@ from app.metrics import (
     PAYMENT_STORE_SIZE,
 )
 from app.models import (
+    DatabaseHealthResponse,
     HealthResponse,
     PaymentRequest,
     PaymentResponse,
     PaymentStatus,
-    build_payment_response,
+    PaymentWithLedgerResponse,
 )
-from app.store import payment_store
+from app.repository import (
+    count_payments,
+    create_payment_transaction,
+    get_payment_by_id,
+    get_payment_with_ledger,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="FinTech-style payment API for FinGuard Deployment Freezer.",
+    lifespan=lifespan,
 )
 
 
@@ -38,13 +56,13 @@ async def collect_http_metrics(request: Request, call_next):
     """
     start_time = time.perf_counter()
     path = request.url.path
+    status_code = "500"
 
     try:
         response = await call_next(request)
         status_code = str(response.status_code)
         return response
     except Exception:
-        status_code = "500"
         PAYMENT_ERRORS_TOTAL.labels(error_type="unhandled_exception").inc()
         raise
     finally:
@@ -71,11 +89,6 @@ def root():
 
 @app.get("/health", response_model=HealthResponse)
 def health():
-    """
-    Liveness endpoint.
-
-    Kubernetes will later use this to check whether the container is alive.
-    """
     return HealthResponse(
         service=settings.app_name,
         status="healthy",
@@ -86,12 +99,6 @@ def health():
 
 @app.get("/ready", response_model=HealthResponse)
 def ready():
-    """
-    Readiness endpoint.
-
-    Kubernetes will later use this to check whether the service is ready
-    to receive traffic.
-    """
     return HealthResponse(
         service=settings.app_name,
         status=settings.readiness_status,
@@ -100,46 +107,63 @@ def ready():
     )
 
 
-@app.post("/pay", response_model=PaymentResponse)
-def create_payment(request: PaymentRequest):
+@app.get("/db/health", response_model=DatabaseHealthResponse)
+def database_health(db: Session = Depends(get_db)):
+    """
+    Confirms that the API can communicate with the database.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        return DatabaseHealthResponse(
+            service=settings.app_name,
+            database="postgresql" if "postgresql" in settings.database_url else "sqlite",
+            status="healthy",
+            details="Database connection successful",
+        )
+    except Exception as exc:
+        PAYMENT_ERRORS_TOTAL.labels(error_type="database_health_check_failed").inc()
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database connection failed: {exc}",
+        ) from exc
+
+
+@app.post("/pay", response_model=PaymentWithLedgerResponse)
+def create_payment(
+    request: PaymentRequest,
+    db: Session = Depends(get_db),
+):
     """
     Simulates a fintech payment authorization.
 
-    Current Phase 1 behavior:
-    - Amount must be greater than zero.
-    - Very large payments are declined.
-    - Valid payments are approved and stored in memory.
+    Phase 3 behavior:
+    - Saves payment transaction in the database.
+    - Creates ledger entries for approved payments.
+    - Stores declined payment decision without ledger entries.
     """
 
-    if request.amount > settings.max_single_payment_amount:
-        payment = build_payment_response(
-            request=request,
-            status=PaymentStatus.DECLINED,
-            message="Payment declined because amount exceeds single payment limit",
-        )
-        payment_store.save(payment)
-        PAYMENT_REQUESTS_TOTAL.labels(status=payment.status.value).inc()
-        PAYMENT_STORE_SIZE.set(payment_store.count())
-        return payment
-
-    payment = build_payment_response(
+    result = create_payment_transaction(
+        db=db,
         request=request,
-        status=PaymentStatus.APPROVED,
-        message="Payment approved",
+        max_single_payment_amount=settings.max_single_payment_amount,
     )
 
-    payment_store.save(payment)
+    PAYMENT_REQUESTS_TOTAL.labels(status=result.payment.status.value).inc()
 
-    PAYMENT_REQUESTS_TOTAL.labels(status=payment.status.value).inc()
-    PAYMENT_AMOUNT_TOTAL.labels(currency=payment.currency).inc(payment.amount)
-    PAYMENT_STORE_SIZE.set(payment_store.count())
+    if result.payment.status == PaymentStatus.APPROVED:
+        PAYMENT_AMOUNT_TOTAL.labels(currency=result.payment.currency).inc(result.payment.amount)
 
-    return payment
+    PAYMENT_STORE_SIZE.set(count_payments(db))
+
+    return result
 
 
 @app.get("/payments/{payment_id}", response_model=PaymentResponse)
-def get_payment(payment_id: str):
-    payment = payment_store.get(payment_id)
+def get_payment(
+    payment_id: str,
+    db: Session = Depends(get_db),
+):
+    payment = get_payment_by_id(db, payment_id)
 
     if payment is None:
         PAYMENT_ERRORS_TOTAL.labels(error_type="payment_not_found").inc()
@@ -148,13 +172,22 @@ def get_payment(payment_id: str):
     return payment
 
 
+@app.get("/payments/{payment_id}/ledger", response_model=PaymentWithLedgerResponse)
+def get_payment_ledger(
+    payment_id: str,
+    db: Session = Depends(get_db),
+):
+    result = get_payment_with_ledger(db, payment_id)
+
+    if result is None:
+        PAYMENT_ERRORS_TOTAL.labels(error_type="payment_not_found").inc()
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    return result
+
+
 @app.get("/simulate/error")
 def simulate_error():
-    """
-    Simulates a payment API failure.
-
-    This will be used later to burn error budget and test deployment freeze logic.
-    """
     PAYMENT_ERRORS_TOTAL.labels(error_type="simulated_error").inc()
     raise HTTPException(status_code=500, detail="Simulated payment API failure")
 
@@ -163,11 +196,6 @@ def simulate_error():
 async def simulate_latency(
     delay_ms: int = Query(default=1000, ge=0, le=10000),
 ):
-    """
-    Simulates slow payment processing.
-
-    This will be used later to test p95 latency alerts and canary rollback.
-    """
     await asyncio.sleep(delay_ms / 1000)
 
     return {
@@ -178,11 +206,6 @@ async def simulate_latency(
 
 @app.get("/metrics")
 def metrics():
-    """
-    Prometheus metrics endpoint.
-
-    Prometheus will scrape this endpoint in a later phase.
-    """
     return Response(
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,
