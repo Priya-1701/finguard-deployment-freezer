@@ -1,108 +1,159 @@
-# Payment API
+# FinGuard Payment API
 
+Production-style fintech payment service for the **FinGuard Deployment Freezer** project.
 
-The Payment API is the first core microservice in the FinGuard Deployment Freezer project.
+This service simulates a real payment authorization system and generates reliability signals that will later be used for SLO checks, error-budget decisions, canary validation, rollback automation, and deployment freeze logic.
 
-It simulates a fintech payment authorization service and produces reliability signals that will later be used for SLOs, error-budget checks, canary validation, rollback decisions, and deployment freeze logic.
+---
 
-Current Phase Status
+## What We Have Built So Far
 
-Completed so far:
+The Payment API currently includes:
 
-Phase 1: Built FastAPI Payment API
-Phase 2: Dockerized the Payment API
-Phase 3: Added PostgreSQL persistence and ledger entries
-Features Implemented
-FastAPI-based payment service
-Health endpoint
-Readiness endpoint
-Payment creation endpoint
-Payment lookup endpoint
-Payment ledger lookup endpoint
-Database health endpoint
-Failure simulation endpoint
-Latency simulation endpoint
-Prometheus metrics endpoint
-Dockerfile
-Docker Compose setup
-PostgreSQL integration
-SQLAlchemy ORM models
-Pytest test coverage
-Trivy image scan workflow
-Endpoints
-Method	Endpoint	Purpose
-GET	/	Service information
-GET	/health	API health check
-GET	/ready	API readiness check
-GET	/db/health	Database connectivity check
-POST	/pay	Create a payment
-GET	/payments/{payment_id}	Fetch payment by ID
-GET	/payments/{payment_id}/ledger	Fetch payment with ledger entries
-GET	/simulate/error	Simulate HTTP 500 error
-GET	/simulate/latency?delay_ms=1000	Simulate slow API response
-GET	/metrics	Prometheus metrics
-Database Tables
-payment_transactions
+* FastAPI-based payment service
+* Dockerized runtime
+* Docker Compose local stack
+* PostgreSQL-backed payment persistence
+* Ledger entry creation for approved payments
+* Database health checks
+* Prometheus metrics
+* Failure and latency simulation
+* Pytest-based API validation
+* Trivy image scanning workflow
 
-Stores payment decisions.
+---
 
-Main fields:
+## Service Architecture
 
-payment_id
-status
-amount
-currency
-merchant_id
-customer_id
-idempotency_key
-message
-created_at
-ledger_entries
+```text
+Client / curl / k6
+      |
+      v
+FastAPI Payment API
+      |
+      |-- /health
+      |-- /ready
+      |-- /db/health
+      |-- /pay
+      |-- /payments/{payment_id}
+      |-- /payments/{payment_id}/ledger
+      |-- /simulate/error
+      |-- /simulate/latency
+      |-- /metrics
+      |
+      v
+PostgreSQL
+      |
+      |-- payment_transactions
+      |-- ledger_entries
+```
+
+---
+
+## Tech Stack Used
+
+| Area                        | Tool                     |
+| --------------------------- | ------------------------ |
+| API Framework               | FastAPI                  |
+| Language                    | Python                   |
+| Database                    | PostgreSQL               |
+| ORM                         | SQLAlchemy               |
+| Containerization            | Docker                   |
+| Local Multi-Service Runtime | Docker Compose           |
+| Metrics                     | Prometheus Python Client |
+| Testing                     | Pytest                   |
+| Security Scan               | Trivy                    |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint                          | Purpose                           |
+| ------ | --------------------------------- | --------------------------------- |
+| GET    | `/`                               | Service information               |
+| GET    | `/health`                         | API liveness check                |
+| GET    | `/ready`                          | API readiness check               |
+| GET    | `/db/health`                      | Database connectivity check       |
+| POST   | `/pay`                            | Create a payment transaction      |
+| GET    | `/payments/{payment_id}`          | Fetch payment details             |
+| GET    | `/payments/{payment_id}/ledger`   | Fetch payment with ledger entries |
+| GET    | `/simulate/error`                 | Simulate API failure              |
+| GET    | `/simulate/latency?delay_ms=1000` | Simulate slow response            |
+| GET    | `/metrics`                        | Prometheus metrics endpoint       |
+
+---
+
+## Database Design
+
+### `payment_transactions`
+
+Stores the final payment decision.
+
+| Field             | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `payment_id`      | Unique payment identifier              |
+| `status`          | `APPROVED` or `DECLINED`               |
+| `amount`          | Payment amount                         |
+| `currency`        | Payment currency                       |
+| `merchant_id`     | Merchant receiving payment             |
+| `customer_id`     | Customer making payment                |
+| `idempotency_key` | Duplicate request protection reference |
+| `message`         | Payment decision message               |
+| `created_at`      | Transaction timestamp                  |
+
+### `ledger_entries`
 
 Stores accounting-style ledger records for approved payments.
 
-Approved payments create:
+For every approved payment, two ledger entries are created:
 
+```text
 DEBIT_CUSTOMER
 CREDIT_MERCHANT
+```
 
-Declined payments are stored, but no ledger entries are created.
+Declined payments are saved in `payment_transactions`, but no ledger movement is created.
 
-Run Locally with Python
+---
 
-From project root:
+## Run the Service with Docker Compose
 
-cd ~/Projects/finguard-deployment-freezer
-source .venv/bin/activate
-cd services/payment-api
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+From the project root:
 
-Test health:
-
-curl -s http://127.0.0.1:8000/health | jq
-Run with Docker Compose
-
-From project root:
-
+```bash
 cd ~/Projects/finguard-deployment-freezer
 make payment-api-compose-up
+```
 
 Check API health:
 
+```bash
 make payment-api-health
+```
 
 Check database health:
 
+```bash
 make payment-api-db-health
+```
 
-Stop services:
+Stop the stack:
 
+```bash
 make payment-api-compose-down
+```
 
-Reset database completely:
+Reset the database completely:
 
+```bash
 make payment-api-compose-reset
-Example Payment Request
+```
+
+---
+
+## Create a Payment
+
+```bash
 curl -s -X POST http://127.0.0.1:8000/pay \
   -H "Content-Type: application/json" \
   -d '{
@@ -112,7 +163,32 @@ curl -s -X POST http://127.0.0.1:8000/pay \
     "customer_id": "customer_001",
     "idempotency_key": "order-001"
   }' | jq
-Example Ledger Lookup
+```
+
+Expected result:
+
+```json
+{
+  "payment": {
+    "status": "APPROVED",
+    "message": "Payment approved"
+  },
+  "ledger_entries": [
+    {
+      "entry_type": "DEBIT_CUSTOMER"
+    },
+    {
+      "entry_type": "CREDIT_MERCHANT"
+    }
+  ]
+}
+```
+
+---
+
+## Fetch Payment Ledger
+
+```bash
 PAYMENT_ID=$(curl -s -X POST http://127.0.0.1:8000/pay \
   -H "Content-Type: application/json" \
   -d '{
@@ -124,38 +200,148 @@ PAYMENT_ID=$(curl -s -X POST http://127.0.0.1:8000/pay \
   }' | jq -r '.payment.payment_id')
 
 curl -s http://127.0.0.1:8000/payments/$PAYMENT_ID/ledger | jq
-Run Tests
+```
 
-From project root:
+---
 
+## Verify Data in PostgreSQL
+
+Open the database shell:
+
+```bash
+make payment-api-db-shell
+```
+
+List tables:
+
+```sql
+\dt
+```
+
+Check recent payments:
+
+```sql
+SELECT payment_id, status, amount, currency, merchant_id, customer_id, created_at
+FROM payment_transactions
+ORDER BY created_at DESC
+LIMIT 5;
+```
+
+Check ledger entries:
+
+```sql
+SELECT ledger_entry_id, payment_id, entry_type, account_ref, amount, currency
+FROM ledger_entries
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+Exit PostgreSQL:
+
+```sql
+\q
+```
+
+---
+
+## Run Tests
+
+From the project root:
+
+```bash
 cd ~/Projects/finguard-deployment-freezer
 source .venv/bin/activate
 pytest
-Docker Image Build
+```
+
+---
+
+## Build Docker Image
+
+```bash
 make payment-api-docker-build
-Trivy Scan
+```
+
+---
+
+## Run Trivy Scan
+
+```bash
 make payment-api-trivy-scan
-Metrics Exposed
-Metric	Purpose
-finguard_http_requests_total	Total HTTP requests by method, path, and status
-finguard_http_request_duration_seconds	API request latency
-finguard_payment_requests_total	Payment count by status
-finguard_payment_amount_total	Approved payment amount by currency
-finguard_payment_errors_total	API error count by type
-finguard_payment_store_size	Total persisted payments
-Why This Service Matters
+```
 
-This service is the base application used by FinGuard Deployment Freezer.
+---
 
-It provides real signals such as:
+## Prometheus Metrics
 
-API health
-Database health
-Payment success/failure
-Latency
-Error rate
-Prometheus metrics
-Persistent transaction data
-Ledger records
+The service exposes metrics at:
 
-These signals will later help decide whether a deployment should continue, pause, roll back, or freeze.
+```text
+/metrics
+```
+
+Important metrics:
+
+| Metric                                   | Purpose                                   |
+| ---------------------------------------- | ----------------------------------------- |
+| `finguard_http_requests_total`           | Request count by method, path, and status |
+| `finguard_http_request_duration_seconds` | Request latency histogram                 |
+| `finguard_payment_requests_total`        | Payment count by status                   |
+| `finguard_payment_amount_total`          | Approved payment volume                   |
+| `finguard_payment_errors_total`          | API error count                           |
+| `finguard_payment_store_size`            | Total persisted payments                  |
+
+Check metrics:
+
+```bash
+curl -s http://127.0.0.1:8000/metrics | grep finguard | head -n 40
+```
+
+---
+
+## Reliability Simulation
+
+The service includes controlled failure and latency endpoints.
+
+Simulate API failure:
+
+```bash
+curl -s -i http://127.0.0.1:8000/simulate/error
+```
+
+Simulate slow response:
+
+```bash
+time curl -s "http://127.0.0.1:8000/simulate/latency?delay_ms=1500" | jq
+```
+
+These endpoints will later be used to test:
+
+* Error-budget burn
+* SLO violations
+* Canary rollback
+* Deployment freeze decisions
+* Alerting behavior
+
+---
+
+## Why This Service Matters
+
+This is not a basic CRUD API.
+
+The Payment API is the reliability signal generator for the entire FinGuard platform. It gives us real service behavior to observe, test, break, recover, and govern.
+
+It produces the key signals needed for production-style release governance:
+
+* API health
+* Database health
+* Payment success rate
+* Payment failure rate
+* Request latency
+* Error count
+* Ledger correctness
+* Prometheus metrics
+* Security scan readiness
+
+This service will become the workload used in later phases for Kubernetes deployment, Prometheus monitoring, Grafana dashboards, Argo Rollouts canary releases, GitHub Actions CI/CD, and error-budget-aware deployment freezing.
+
