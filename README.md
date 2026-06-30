@@ -61,7 +61,7 @@ based on production-style indicators such as:
 | Phase 1  | Completed | FastAPI Payment API with health, readiness, metrics, failure simulation, and tests       |
 | Phase 2  | Completed | Dockerized Payment API with Dockerfile, Docker Compose, healthcheck, and Trivy workflow  |
 | Phase 3  | Completed | PostgreSQL persistence, payment transactions, ledger entries, and database health checks |
-| Phase 4  | Upcoming  | Local KIND Kubernetes deployment                                                         |
+| Phase 4  | Completed  | Local KIND Kubernetes deployment                                                         |
 | Phase 5  | Upcoming  | Prometheus and Grafana observability                                                     |
 | Phase 6  | Upcoming  | Error-budget-aware deployment freezer controller                                         |
 | Phase 7  | Upcoming  | Argo Rollouts canary, blue-green, promotion, and rollback                                |

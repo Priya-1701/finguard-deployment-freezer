@@ -3,7 +3,8 @@
         payment-api-docker-build payment-api-docker-run payment-api-docker-logs payment-api-docker-stop \
         payment-api-docker-health payment-api-docker-metrics payment-api-compose-up payment-api-compose-down \
         payment-api-compose-reset payment-api-compose-logs payment-api-db-health payment-api-db-shell \
-        payment-api-trivy-scan
+        payment-api-trivy-scan kind-create kind-delete kind-load-images k8s-apply k8s-delete \
+        k8s-status k8s-wait k8s-logs k8s-port-forward k8s-db-shell k8s-restart k8s-scale-up k8s-scale-down
 
 phase0-check:
 	./scripts/phase0_doctor.sh
@@ -83,3 +84,52 @@ payment-api-db-shell:
 
 payment-api-trivy-scan:
 	trivy image --severity HIGH,CRITICAL --ignore-unfixed finguard/payment-api:phase-3
+
+kind-create:
+	kind create cluster --name finguard-local --config platform/kind/finguard-kind-config.yaml
+
+kind-delete:
+	kind delete cluster --name finguard-local
+
+kind-load-images:
+	docker build -t finguard/payment-api:phase-4 services/payment-api
+	docker pull postgres:16-alpine
+	kind load docker-image finguard/payment-api:phase-4 --name finguard-local
+	kind load docker-image postgres:16-alpine --name finguard-local
+
+k8s-apply:
+	kubectl apply -k platform/k8s/overlays/local
+
+k8s-delete:
+	kubectl delete -k platform/k8s/overlays/local
+
+k8s-status:
+	kubectl -n finguard get all
+	kubectl -n finguard get pvc
+	kubectl -n finguard get svc
+
+k8s-wait:
+	kubectl -n finguard wait --for=condition=ready pod/postgres-0 --timeout=180s
+	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+
+k8s-logs:
+	kubectl -n finguard logs postgres-0 --tail=50
+	kubectl -n finguard logs deployment/payment-api --tail=50
+
+k8s-port-forward:
+	kubectl -n finguard port-forward svc/payment-api 8000:8000
+
+k8s-db-shell:
+	kubectl -n finguard exec -it postgres-0 -- psql -U finguard_user -d finguard
+
+k8s-restart:
+	kubectl -n finguard rollout restart deployment/payment-api
+	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+
+k8s-scale-up:
+	kubectl -n finguard scale deployment/payment-api --replicas=2
+	kubectl -n finguard rollout status deployment/payment-api --timeout=180s
+
+k8s-scale-down:
+	kubectl -n finguard scale deployment/payment-api --replicas=1
+	kubectl -n finguard rollout status deployment/payment-api --timeout=180s

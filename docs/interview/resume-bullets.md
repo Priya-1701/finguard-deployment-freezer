@@ -39,3 +39,15 @@
 - Added database health checking through a `/db/health` endpoint to support future Kubernetes readiness, observability, alerting, and deployment-freezer decisions.
 
 - Built a local Docker Compose stack for Payment API and PostgreSQL, including database health checks, persistent volumes, and direct SQL verification through psql.
+
+## Phase 4 Resume Bullets
+
+- Deployed a containerized FastAPI payment service and PostgreSQL database onto a local KIND Kubernetes cluster using production-style Kubernetes manifests.
+
+- Implemented Kubernetes Namespace, ConfigMap, Secret, Service, StatefulSet, Deployment, PersistentVolumeClaim, probes, and resource requests/limits.
+
+- Configured PostgreSQL as a StatefulSet with persistent storage and deployed the Payment API as a stateless Kubernetes Deployment.
+
+- Added startup, liveness, and readiness probes, including database-aware readiness checks to prevent routing traffic to unhealthy application pods.
+
+- Validated Kubernetes service behavior using kubectl port-forward, API health checks, database health checks, payment creation, ledger verification, and direct PostgreSQL inspection.

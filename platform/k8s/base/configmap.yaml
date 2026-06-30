@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finguard-config
+  namespace: finguard
+data:
+  APP_ENV: "kubernetes"
+  POSTGRES_DB: "finguard"
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  PAYMENT_API_PORT: "8000"
