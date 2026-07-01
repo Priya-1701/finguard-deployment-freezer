@@ -5,12 +5,16 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - secret.yaml
+
   - postgres-service.yaml
   - postgres-statefulset.yaml
-  - payment-api-deployment.yaml
+
+  - payment-api-rollout.yaml
   - payment-api-service.yaml
+  - payment-api-preview-service.yaml
   - payment-api-servicemonitor.yaml
   - payment-api-prometheusrule.yaml
+
   - freezer-controller-configmap.yaml
   - freezer-controller-deployment.yaml
   - freezer-controller-service.yaml

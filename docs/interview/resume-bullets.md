@@ -63,3 +63,15 @@
 - Containerized and deployed the freezer controller to local KIND Kubernetes with health probes, resource limits, Service, ConfigMap, and ServiceMonitor.
 
 - Exposed freezer-controller metrics to Prometheus to make release-governance decisions observable and auditable.
+
+## Phase 7 Resume Bullets
+
+- Integrated Argo Rollouts to implement progressive delivery strategies for a Kubernetes-based fintech payment service.
+
+- Replaced standard Kubernetes Deployment with Argo Rollout to support canary deployment, blue-green deployment, manual promotion, abort, and rollback workflows.
+
+- Configured canary rollout stages with progressive traffic shifting and freezer-controller analysis checks before promotion.
+
+- Implemented blue-green deployment using active and preview Kubernetes Services to validate new versions before production traffic cutover.
+
+- Connected progressive delivery with live SRE signals by using an AnalysisTemplate to call an error-budget-aware Deployment Freezer Controller before rollout promotion.

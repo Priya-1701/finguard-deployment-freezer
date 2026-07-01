@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """
 
     app_name: str = "FinGuard Payment API"
-    app_version: str = "1.0.0"
+    app_version: str = "1.2.0-risky"
     app_env: str = "local"
 
     max_single_payment_amount: float = 100000.00

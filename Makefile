@@ -179,3 +179,85 @@ freezer-metrics:
 
 freezer-logs:
 	kubectl -n finguard logs deployment/freezer-controller --tail=100
+
+.PHONY: rollouts-install rollouts-status rollouts-dashboard rollout-get rollout-watch rollout-promote rollout-abort rollout-undo rollout-canary-apply rollout-bluegreen-apply rollout-delete-deployment
+
+rollouts-install:
+	kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+	kubectl -n argo-rollouts rollout status deployment/argo-rollouts --timeout=180s
+
+rollouts-status:
+	kubectl -n argo-rollouts get pods
+	kubectl -n finguard get rollout
+	kubectl -n finguard get analysisrun || true
+
+rollouts-dashboard:
+	kubectl argo rollouts dashboard
+
+rollout-get:
+	kubectl argo rollouts get rollout payment-api -n finguard
+
+rollout-watch:
+	kubectl argo rollouts get rollout payment-api -n finguard --watch
+
+rollout-promote:
+	kubectl argo rollouts promote payment-api -n finguard
+
+rollout-abort:
+	kubectl argo rollouts abort payment-api -n finguard
+
+rollout-undo:
+	kubectl argo rollouts undo payment-api -n finguard
+
+rollout-delete-deployment:
+	kubectl -n finguard delete deployment payment-api --ignore-not-found=true
+
+rollout-canary-apply:
+	kubectl -n finguard delete deployment payment-api --ignore-not-found=true
+	kubectl apply -k platform/k8s/overlays/local
+
+rollout-bluegreen-apply:
+	kubectl -n finguard delete rollout payment-api --ignore-not-found=true
+	kubectl apply -k platform/k8s/overlays/bluegreen
+
+.PHONY: rollouts-install rollouts-status rollouts-dashboard rollout-get rollout-watch rollout-promote rollout-abort rollout-undo rollout-canary-apply rollout-bluegreen-apply rollout-delete-deployment
+
+rollouts-install:
+	kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+	kubectl -n argo-rollouts rollout status deployment/argo-rollouts --timeout=180s
+
+rollouts-status:
+	kubectl -n argo-rollouts get pods
+	kubectl -n finguard get rollout
+	kubectl -n finguard get analysisrun || true
+
+rollouts-dashboard:
+	kubectl argo rollouts dashboard
+
+rollout-get:
+	kubectl argo rollouts get rollout payment-api -n finguard
+
+rollout-watch:
+	kubectl argo rollouts get rollout payment-api -n finguard --watch
+
+rollout-promote:
+	kubectl argo rollouts promote payment-api -n finguard
+
+rollout-abort:
+	kubectl argo rollouts abort payment-api -n finguard
+
+rollout-undo:
+	kubectl argo rollouts undo payment-api -n finguard
+
+rollout-delete-deployment:
+	kubectl -n finguard delete deployment payment-api --ignore-not-found=true
+
+rollout-canary-apply:
+	kubectl -n finguard delete deployment payment-api --ignore-not-found=true
+	kubectl apply -k platform/k8s/overlays/local
+
+rollout-bluegreen-apply:
+	kubectl -n finguard delete rollout payment-api --ignore-not-found=true
+	kubectl apply -k platform/k8s/overlays/bluegreen

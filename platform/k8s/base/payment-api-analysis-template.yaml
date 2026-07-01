@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: payment-api-freezer-check
+  labels:
+    app.kubernetes.io/name: payment-api
+    app.kubernetes.io/part-of: finguard-deployment-freezer
+spec:
+  metrics:
+    - name: freezer-decision
+      interval: 30s
+      count: 1
+      successCondition: result == true
+      failureCondition: result == false
+      provider:
+        web:
+          url: "http://freezer-controller:8010/decision"
+          timeoutSeconds: 10
+          jsonPath: "{$.allowed}"
