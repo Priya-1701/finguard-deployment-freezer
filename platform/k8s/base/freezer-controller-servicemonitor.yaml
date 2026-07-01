@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: freezer-controller
+  labels:
+    app.kubernetes.io/name: freezer-controller
+    app.kubernetes.io/part-of: finguard-deployment-freezer
+    release: monitoring
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: freezer-controller
+  namespaceSelector:
+    matchNames:
+      - finguard
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

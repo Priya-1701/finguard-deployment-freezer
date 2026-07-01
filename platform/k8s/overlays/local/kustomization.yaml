@@ -4,6 +4,4 @@ kind: Kustomization
 resources:
   - ../../base
 
-images:
-  - name: finguard/payment-api
-    newTag: phase-4
+namespace: finguard

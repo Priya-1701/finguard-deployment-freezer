@@ -145,3 +145,37 @@ monitoring-test-latency:
 		curl -s "http://127.0.0.1:8000/simulate/latency?delay_ms=1200" >/dev/null; \
 		sleep 1; \
 	done
+
+.PHONY: freezer-test freezer-build freezer-load freezer-apply freezer-status freezer-port-forward freezer-decision freezer-policy freezer-metrics freezer-logs
+
+freezer-test:
+	. .venv/bin/activate && pytest services/freezer-controller/tests
+
+freezer-build:
+	docker build -t finguard/freezer-controller:phase-6 services/freezer-controller
+
+freezer-load:
+	kind load docker-image finguard/freezer-controller:phase-6 --name finguard-local
+
+freezer-apply:
+	kubectl apply -k platform/k8s/overlays/local
+
+freezer-status:
+	kubectl -n finguard rollout status deployment/freezer-controller --timeout=180s
+	kubectl -n finguard get pods
+	kubectl -n finguard get svc freezer-controller
+
+freezer-port-forward:
+	kubectl -n finguard port-forward svc/freezer-controller 8010:8010
+
+freezer-decision:
+	curl -s http://127.0.0.1:8010/decision | jq
+
+freezer-policy:
+	curl -s http://127.0.0.1:8010/policy | jq
+
+freezer-metrics:
+	curl -s http://127.0.0.1:8010/metrics | grep finguard_freezer
+
+freezer-logs:
+	kubectl -n finguard logs deployment/freezer-controller --tail=100

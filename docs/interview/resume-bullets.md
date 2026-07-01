@@ -51,3 +51,15 @@
 - Added startup, liveness, and readiness probes, including database-aware readiness checks to prevent routing traffic to unhealthy application pods.
 
 - Validated Kubernetes service behavior using kubectl port-forward, API health checks, database health checks, payment creation, ledger verification, and direct PostgreSQL inspection.
+
+## Phase 6 Resume Bullets
+
+- Built an error-budget-aware Deployment Freezer Controller using Python and FastAPI to evaluate live Prometheus metrics before allowing releases.
+
+- Implemented deployment safety decisions including `ALLOW_DEPLOYMENT`, `MANUAL_REVIEW_REQUIRED`, `FREEZE_DEPLOYMENT`, and `ROLLBACK_REQUIRED`.
+
+- Integrated Prometheus HTTP API queries for Payment API target availability, 5xx error rate, p95 latency, active alerts, and approximate error-budget burn.
+
+- Containerized and deployed the freezer controller to local KIND Kubernetes with health probes, resource limits, Service, ConfigMap, and ServiceMonitor.
+
+- Exposed freezer-controller metrics to Prometheus to make release-governance decisions observable and auditable.

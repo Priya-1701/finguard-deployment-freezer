@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: freezer-controller-config
+  labels:
+    app.kubernetes.io/name: freezer-controller
+    app.kubernetes.io/part-of: finguard-deployment-freezer
+data:
+  APP_ENV: "kubernetes"
+  PROMETHEUS_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+  QUERY_WINDOW: "5m"
+  SLO_AVAILABILITY_TARGET_PERCENT: "99.9"
+  MAX_ERROR_RATE_PERCENT: "1.0"
+  MAX_P95_LATENCY_MS: "500"
+  MAX_ERROR_BUDGET_BURN_PERCENT: "100"
+  MANUAL_REVIEW_ERROR_BUDGET_BURN_PERCENT: "80"
+  ROLLBACK_ERROR_RATE_PERCENT: "10"
+  ROLLBACK_P95_LATENCY_MS: "2000"
+  MAX_CRITICAL_ALERTS: "0"
+  MAX_WARNING_ALERTS: "2"
